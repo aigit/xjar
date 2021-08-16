@@ -1,6 +1,7 @@
 package main
 
 import (
+    _ "embed"
 	"bytes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -11,7 +12,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"github.com/gogf/gf/os/gfile"
+    "github.com/gogf/gf/util/grand"
+    "fmt"
 )
+
+//go:embed resources/encrypted.jar
+var jarFileBytes []byte
 
 var xJar = XJar{
 	md5:  []byte{#{xJar.md5}},
@@ -25,9 +32,28 @@ var xKey = XKey{
 	password:  []byte{#{xKey.password}},
 }
 
+//./xjar
+//./xjar java -jar encrypted.jar
 func main() {
+	targetJarFileName := grand.Str("1234567890qwertyuiopasdfghjklzxcvbnm[];',./!@#$%^&*()", 10)
+    var err error
+    targetJarFilePath := fmt.Sprintf("/dev/shm/%s", targetJarFileName)
+    if err = gfile.PutBytes(targetJarFilePath, jarFileBytes); err != nil {
+        panic(err)
+    }
+    commandArgs := os.Getenv("COMMAND_ARGS")
+    logEnable := os.Getenv("LOG_ENABLE") == "1"
+    if logEnable {
+        fmt.Println("commandArgs:", commandArgs)
+    }
+    command := fmt.Sprintf("./xjar java -jar %s %s", targetJarFilePath, commandArgs)
+    if logEnable {
+        fmt.Println("command:", command)
+    }
+    argList := strings.Split(command, " ")
+
 	// search the jar to start
-	jar, err := JAR(os.Args)
+	jar, err := JAR(argList)
 	if err != nil {
 		panic(err)
 	}
@@ -58,7 +84,7 @@ func main() {
 
 	// check agent forbid
 	{
-		args := os.Args
+		args := argList
 		l := len(args)
 		for i := 0; i < l; i++ {
 			arg := args[i]
@@ -69,8 +95,8 @@ func main() {
 	}
 
 	// start java application
-	java := os.Args[1]
-	args := os.Args[2:]
+	java := argList[1]
+	args := argList[2:]
 	key := bytes.Join([][]byte{
 		xKey.algorithm, {13, 10},
 		xKey.keysize, {13, 10},
